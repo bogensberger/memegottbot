@@ -15,8 +15,14 @@ class MemeGodBot:
         now = datetime.now()
         print("Hello, it's {}".format(now.strftime('%Y%m%d %HH:%MM')))
 
+    def is_election_running(self):
+        now = datetime.now()
+        if now.weekday() is 0 and now.hour < 23:
+            return True
+        return False
+
     def message_received(self, update, context):
-        if datetime.now().weekday() is not 0:
+        if not self.is_election_running():
             return
         chat_id = str(update.message.chat_id)
         from_user = update.message.from_user
@@ -24,21 +30,20 @@ class MemeGodBot:
             self.elections[chat_id] = {}
         current_election = self.current_election()
         if not current_election in self.elections[chat_id]:
-            self.elections[chat_id][current_election] = {"candidates": [], "votes":{}}
-        username = from_user.username
-        if not username:
-            username = "{0} ({1})".format(from_user.first_name, str(from_user.id))
-        if username in self.elections[chat_id][current_election]["candidates"]:
+            self.elections[chat_id][current_election] = {"candidates": {}, "votes":{}}
+        user_id = str(from_user.id)
+        name = from_user.name
+        if user_id in self.elections[chat_id][current_election]["candidates"]:
             return
         bot = self.updater.bot
         vote_button = telegram.InlineKeyboardButton(
-                text="Vote for {0}".format(username),
-                callback_data=json.dumps({"candidate": username, "election_date": current_election})
+                text="Vote for {0}".format(name),
+                callback_data=json.dumps({"candidate": user_id, "election_date": current_election})
         )
         bot.send_message(chat_id,
-                "Soll @{0} Meme Gott werden?".format(username),
+                "Soll {0} Meme Gott werden?".format(name),
                 reply_markup=telegram.InlineKeyboardMarkup([[vote_button]]))
-        self.elections[chat_id][current_election]["candidates"].append(username)
+        self.elections[chat_id][current_election]["candidates"][user_id] = name
         self.save_elections()
 
     def start_listening(self):
@@ -49,17 +54,17 @@ class MemeGodBot:
         self.updater.start_polling()
 
     def handle_btn_press(self, update, callback):
+        if not self.is_election_running():
+            update.callback_query.answer(text="Sorry, die Wahl ist schon vorbei")
         query_data = json.loads(update.callback_query.data)
         chat_id = str(update.callback_query.message.chat.id)
         vote_for = query_data['candidate']
         election_date = query_data['election_date']
-        voter = update.callback_query.from_user.username
-        if voter is None:
-            from_user = update.callback_query.from_user
-            voter = "{0} ({1})".format(from_user.first_name, str(from_user.id))
+        voter = str(update.callback_query.from_user.id)
         self.elections[chat_id][election_date]["votes"][voter] = vote_for
         self.save_elections()
-        update.callback_query.answer(text="Du hast für @{0} gestimmt".format(vote_for))
+        vote_for_name = self.elections[chat_id][election_date]["candidates"][vote_for]
+        update.callback_query.answer(text="Du hast für {0} gestimmt".format(vote_for_name))
 
     def call_winner(self, chat_id):
         if chat_id not in self.elections:
@@ -79,7 +84,7 @@ class MemeGodBot:
                 candidates[candidate] += 1
         result = "Hier die Abstimmungsergebnisse zum dieswöchigen Memegott:\n\n"
         for candidate, votes in sorted(candidates.items(), key=lambda item: item[1], reverse=True):
-            result += "@{0} - {1}\n".format(candidate, votes)
+            result += "{0} - {1}\n".format(self.elections[chat_id][current_election]["candidates"][candidate], votes)
         self.updater.bot.send_message(chat_id, result)
 
 
