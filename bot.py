@@ -43,7 +43,7 @@ class MemeGodBot:
         bot.send_message(chat_id,
                 "Soll {0} Meme Gott werden?".format(name),
                 reply_markup=telegram.InlineKeyboardMarkup([[vote_button]]))
-        self.elections[chat_id][current_election]["candidates"][user_id] = name
+        self.elections[chat_id][current_election]["candidates"][user_id] = {"name": name, "message": update.message.message_id}
         self.save_elections()
 
     def start_listening(self):
@@ -63,7 +63,7 @@ class MemeGodBot:
         voter = str(update.callback_query.from_user.id)
         self.elections[chat_id][election_date]["votes"][voter] = vote_for
         self.save_elections()
-        vote_for_name = self.elections[chat_id][election_date]["candidates"][vote_for]
+        vote_for_name = self.elections[chat_id][election_date]["candidates"][vote_for]["name"]
         update.callback_query.answer(text="Du hast für {0} gestimmt".format(vote_for_name))
 
     def call_winner(self, chat_id):
@@ -83,9 +83,17 @@ class MemeGodBot:
             else:
                 candidates[candidate] += 1
         result = "Hier die Abstimmungsergebnisse zum dieswöchigen Memegott:\n\n"
+        winners = []
+        highest_votes = None
         for candidate, votes in sorted(candidates.items(), key=lambda item: item[1], reverse=True):
-            result += "{0} - {1}\n".format(self.elections[chat_id][current_election]["candidates"][candidate], votes)
+            result += "{0} - {1}\n".format(self.elections[chat_id][current_election]["candidates"][candidate]["name"], votes)
+            if highest_votes is None:
+                highest_votes = votes
+            if votes == highest_votes:
+                winners.append(self.elections[chat_id][current_election]["candidates"][candidate]["message"])
         self.updater.bot.send_message(chat_id, result)
+        for message in winners:
+            self.updater.bot.send_message(chat_id, reply_to_message_id=message, text="#gewinnermeme")
 
 
 
