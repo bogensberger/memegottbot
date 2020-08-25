@@ -25,17 +25,20 @@ class MemeGodBot:
         current_election = self.current_election()
         if not current_election in self.elections[chat_id]:
             self.elections[chat_id][current_election] = {"candidates": [], "votes":{}}
-        if from_user.username in self.elections[chat_id][current_election]["candidates"]:
+        username = from_user.username
+        if not username:
+            username = "{0} ({1})".format(from_user.first_name, str(from_user.id))
+        if username in self.elections[chat_id][current_election]["candidates"]:
             return
         bot = self.updater.bot
         vote_button = telegram.InlineKeyboardButton(
-                text="Vote for {0}".format(from_user.username),
-                callback_data=json.dumps({"candidate": from_user.username, "election_date": current_election})
+                text="Vote for {0}".format(username),
+                callback_data=json.dumps({"candidate": username, "election_date": current_election})
         )
         bot.send_message(chat_id,
-                "Soll @{0} Meme Gott werden?".format(from_user.username),
+                "Soll @{0} Meme Gott werden?".format(username),
                 reply_markup=telegram.InlineKeyboardMarkup([[vote_button]]))
-        self.elections[chat_id][current_election]["candidates"].append(from_user.username)
+        self.elections[chat_id][current_election]["candidates"].append(username)
         self.save_elections()
 
     def start_listening(self):
@@ -51,6 +54,9 @@ class MemeGodBot:
         vote_for = query_data['candidate']
         election_date = query_data['election_date']
         voter = update.callback_query.from_user.username
+        if voter is None:
+            from_user = update.callback_query.from_user
+            voter = "{0} ({1})".format(from_user.first_name, str(from_user.id))
         self.elections[chat_id][election_date]["votes"][voter] = vote_for
         self.save_elections()
         update.callback_query.answer(text="Du hast für @{0} gestimmt".format(vote_for))
