@@ -9,7 +9,7 @@ class MemeGodBot:
 
     def __init__(self, api_token, elections):
         self.token = api_token
-        self.updater = Updater(token=self.token, use_context=True)
+        self.updater = Updater(token=self.token, use_context=True, request_kwargs={'read_timeout': 10})
         self.election_file = elections
         self.elections = self.read_elections()
         now = datetime.now()
